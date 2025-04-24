@@ -140,10 +140,10 @@ def get_tracks_3d_for_query_frame(
     visible_counts = visibles.sum(0)
     valid = valid & (
         visible_counts
-        >= min(
+        >= (min(
             int(0.05 * T),
             visible_counts.float().quantile(0.1).item(),
-        )
+        ) if len(visible_counts) > 0 else int(0.05 * T))
     )
 
     # Get track's color from the query frame.

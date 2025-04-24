@@ -69,7 +69,7 @@ class CustomDataConfig:
         "depth_anything_v2",
         "unidepth_disp",
     ] = "aligned_depth_anything"
-    camera_type: Literal["droid_recon", "megasam"] = "megasam"
+    camera_type: Literal["droid_recon", "megasam"] = "droid_recon" # "megasam"
     track_2d_type: Literal["bootstapir", "tapir"] = "bootstapir"
     mask_erosion_radius: int = 7
     scene_norm_dict: tyro.conf.Suppress[SceneNormDict | None] = None
