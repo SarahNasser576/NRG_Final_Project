@@ -334,6 +334,8 @@ class Trainer:
             surf_normals = surf_normals.reshape(rendered_normals.shape)
             cos_sim = torch.sum(rendered_normals * surf_normals, dim=-1)
             normal_loss = (1 - cos_sim).mean()
+            if torch.isnan(normal_loss):
+                print("2DGS normal consistency loss is NaN")
             loss += normal_loss * 0.05
 
 
@@ -347,6 +349,8 @@ class Trainer:
         rgb_loss = 0.8 * F.l1_loss(rendered_imgs, imgs) + 0.2 * (
             1 - self.ssim(rendered_imgs.permute(0, 3, 1, 2), imgs.permute(0, 3, 1, 2))
         )
+        if torch.isnan(rgb_loss):
+            print("RGB loss is NaN")
         loss += rgb_loss * self.losses_cfg.w_rgb
 
         # Mask loss.
@@ -360,6 +364,9 @@ class Trainer:
                 masks[..., None],
                 quantile=0.98,  # type: ignore
             )
+        if torch.isnan(mask_loss):
+            print("Mask loss is NaN", "setting to 0")
+            mask_loss = torch.tensor(0.0)
         loss += mask_loss * self.losses_cfg.w_mask
 
         # (B * N, H * W, 3).
@@ -391,12 +398,20 @@ class Trainer:
             masks_flatten.reshape(-1, H * W).tile(1, N).reshape(-1, H * W) > 0.5
         )
 
-        track_2d_loss = masked_l1_loss(
-            pred_tracks_2d[masks_flatten][visibles],
-            tracks_2d[visibles],
-            mask=track_weights[visibles],
-            quantile=0.98,
-        ) / max(H, W)
+        # print("pred tracks:\n", pred_tracks_2d[masks_flatten][visibles].size())
+        # print("gt tracks:\n", tracks_2d[visibles].size())
+
+        if tracks_2d[visibles].size(0) != 0: # Moving object not in frame --> otherwise no tracks
+            track_2d_loss = masked_l1_loss(
+                pred_tracks_2d[masks_flatten][visibles],
+                tracks_2d[visibles],
+                mask=track_weights[visibles],
+                quantile=0.98,
+            ) / max(H, W)
+        else:
+            track_2d_loss = torch.tensor(0.0)
+        if torch.isnan(track_2d_loss):
+            print("Track 2D loss is NaN")
         loss += track_2d_loss * self.losses_cfg.w_track
 
         depth_masks = (
@@ -412,6 +427,8 @@ class Trainer:
             mask=depth_masks,
             quantile=0.98,
         )
+        if torch.isnan(depth_loss):
+            print("Depth loss is NaN")
         loss += depth_loss * self.losses_cfg.w_depth_reg
 
         # mapped depth loss (using cached depth with EMA)
@@ -422,7 +439,8 @@ class Trainer:
             1 / (mapped_depth_gt[visibles, None] + 1e-5),
             track_weights[visibles],
         )
-
+        if torch.isnan(mapped_depth_loss):
+            print("Mapped depth loss is NaN")
         loss += mapped_depth_loss * self.losses_cfg.w_depth_const
 
         #  depth_gradient_loss = 0.0
@@ -432,6 +450,8 @@ class Trainer:
             mask=depth_masks > 0.5,
             quantile=0.95,
         )
+        if torch.isnan(depth_gradient_loss):
+            print("Depth gradient loss is NaN")
         loss += depth_gradient_loss * self.losses_cfg.w_depth_grad
 
         # bases should be smooth.
@@ -439,6 +459,8 @@ class Trainer:
             self.model.motion_bases.params["rots"],
             self.model.motion_bases.params["transls"],
         )
+        if torch.isnan(small_accel_loss):
+            print("Small accel loss is NaN")
         loss += small_accel_loss * self.losses_cfg.w_smooth_bases
 
         # tracks should be smooth
@@ -459,6 +481,8 @@ class Trainer:
                 .norm(dim=-1)
                 .mean()
             )
+            if torch.isnan(small_accel_loss_tracks):
+                print("Small accel loss tracks is NaN")
             loss += small_accel_loss_tracks * self.losses_cfg.w_smooth_tracks
 
 
